@@ -54,3 +54,22 @@ type APIError struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error"`
 }
+
+// LoginRequest represents a login request
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// LoginResponse represents a login response
+type LoginResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Token   string `json:"token,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+// LogoutRequest represents a logout request
+type LogoutRequest struct {
+	Token string `json:"token"`
+}

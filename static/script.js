@@ -4,6 +4,7 @@ const API_BASE = '/api/recipes';
 // Global variables
 let currentEditingId = null;
 let recipes = [];
+let authToken = null;
 
 // DOM Elements
 const recipeForm = document.getElementById('recipe-form');
@@ -13,25 +14,65 @@ const submitBtn = document.getElementById('submit-btn');
 const cancelBtn = document.getElementById('cancel-btn');
 const formTitle = document.getElementById('form-title');
 const refreshBtn = document.getElementById('refresh-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const userInfo = document.getElementById('user-info');
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
-    loadRecipes();
+    checkAuthentication();
     setupEventListeners();
 });
+
+// Check authentication status
+function checkAuthentication() {
+    authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+        // No token, redirect to login
+        window.location.href = '/login.html';
+        return;
+    }
+    
+    // Verify token is valid
+    fetch(API_BASE, {
+        headers: {
+            'Authorization': `Bearer ${authToken}`
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            // Token is valid, load the app
+            userInfo.textContent = 'Welcome! You are logged in.';
+            loadRecipes();
+        } else {
+            // Token is invalid, redirect to login
+            localStorage.removeItem('authToken');
+            window.location.href = '/login.html';
+        }
+    })
+    .catch(error => {
+        console.error('Auth check error:', error);
+        localStorage.removeItem('authToken');
+        window.location.href = '/login.html';
+    });
+}
 
 // Setup event listeners
 function setupEventListeners() {
     recipeForm.addEventListener('submit', handleFormSubmit);
     cancelBtn.addEventListener('click', cancelEdit);
     refreshBtn.addEventListener('click', loadRecipes);
+    logoutBtn.addEventListener('click', handleLogout);
 }
 
 // Load all recipes
 async function loadRecipes() {
     try {
         showLoading(true);
-        const response = await fetch(API_BASE);
+        const response = await fetch(API_BASE, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
         const data = await response.json();
         
         if (data.success) {
@@ -131,6 +172,7 @@ async function handleFormSubmit(e) {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
                 },
                 body: JSON.stringify(recipeData)
             });
@@ -140,6 +182,7 @@ async function handleFormSubmit(e) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
                 },
                 body: JSON.stringify(recipeData)
             });
@@ -208,7 +251,10 @@ async function deleteRecipe(id) {
 
     try {
         const response = await fetch(`${API_BASE}/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
         });
 
         const data = await response.json();
@@ -259,4 +305,41 @@ function escapeHtml(text) {
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+}
+
+// Handle logout
+async function handleLogout() {
+    if (!confirm('Are you sure you want to logout?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/logout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            // Remove token from localStorage
+            localStorage.removeItem('authToken');
+            showToast('Logged out successfully', 'success');
+            
+            // Redirect to login page after a short delay
+            setTimeout(() => {
+                window.location.href = '/login.html';
+            }, 1000);
+        } else {
+            throw new Error(data.error || 'Logout failed');
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        // Even if logout fails on server, clear local token
+        localStorage.removeItem('authToken');
+        window.location.href = '/login.html';
+    }
 }

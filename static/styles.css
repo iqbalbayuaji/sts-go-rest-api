@@ -37,6 +37,24 @@ header p {
     opacity: 0.9;
 }
 
+.auth-info {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
+.auth-info span {
+    color: white;
+    font-weight: 600;
+}
+
+.auth-info button {
+    padding: 8px 16px;
+    font-size: 14px;
+}
+
 /* Main content */
 main {
     display: grid;

@@ -1,0 +1,13 @@
+users:
+  - username: "admin"
+    password: "admin123"
+  - username: "user1"
+    password: "password123"
+  - username: "chef"
+    password: "cooking456"
+
+# JWT secret for token signing (CHANGE THIS IN PRODUCTION!)
+jwt_secret: "your-super-secret-jwt-key-change-this-in-production"
+
+# Token expiration time in hours
+token_expiry_hours: 24

@@ -1,17 +1,28 @@
 # Recipe Notes - Go REST API Application
 
-A simple client-server application for managing recipe notes using Go's `net/http` library with a web interface.
+A secure client-server application for managing recipe notes using Go's `net/http` library with authentication and a web interface.
 
 ## Features
 
-- **CRUD Operations**: Create, Read, Update, and Delete recipes
-- **REST API**: Clean RESTful endpoints
-- **Web Interface**: User-friendly HTML interface with JavaScript
-- **JSON Storage**: Data persistence using JSON files
-- **Responsive Design**: Works on desktop and mobile devices
+- **🔐 Authentication System**: Token-based authentication with login/logout
+- **🛡️ Secure API**: All recipe endpoints protected with Bearer token authentication
+- **📝 CRUD Operations**: Create, Read, Update, and Delete recipes
+- **🌐 REST API**: Clean RESTful endpoints with proper HTTP status codes
+- **💻 Web Interface**: User-friendly HTML interface with JavaScript
+- **📁 JSON Storage**: Data persistence using JSON files
+- **⚙️ YAML Configuration**: User management via configuration file
+- **📱 Responsive Design**: Works on desktop and mobile devices
+- **🔄 Token Management**: Automatic token cleanup and expiration handling
 
 ## API Endpoints
 
+### Authentication Endpoints (Public)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/login` | Login with username/password, returns Bearer token |
+| POST | `/api/logout` | Logout and invalidate token |
+
+### Recipe Endpoints (Protected - Requires Bearer Token)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/recipes` | Get all recipes |
@@ -25,14 +36,21 @@ A simple client-server application for managing recipe notes using Go's `net/htt
 recipe-api/
 ├── main.go              # Server entry point
 ├── go.mod               # Go module file
+├── config.yaml          # Authentication configuration (users, JWT secret)
+├── config.yaml.example  # Sample configuration file
+├── auth/                # Authentication services
+│   └── auth_service.go  # Token management and validation
 ├── handlers/            # HTTP request handlers
-│   └── recipe_handler.go
+│   ├── recipe_handler.go # Recipe CRUD operations
+│   └── auth_handler.go   # Login/logout and middleware
 ├── models/              # Data structures
-│   └── recipe.go
+│   ├── recipe.go        # Recipe and API response models
+│   └── config.go        # Configuration models
 ├── storage/             # Data persistence layer
-│   └── json_storage.go
+│   └── json_storage.go  # JSON file operations
 ├── static/              # Web interface files
-│   ├── index.html       # Main HTML page
+│   ├── index.html       # Main recipe management page
+│   ├── login.html       # Login page
 │   ├── styles.css       # CSS styling
 │   └── script.js        # JavaScript functionality
 ├── data/                # JSON data storage
@@ -56,6 +74,40 @@ recipe-api/
 }
 ```
 
+## Authentication Configuration
+
+### Setup Configuration File
+
+1. **Copy the example configuration**:
+   ```bash
+   cp config.yaml.example config.yaml
+   ```
+
+2. **Edit config.yaml** to customize users and security settings:
+   ```yaml
+   users:
+     - username: "admin"
+       password: "admin123"
+     - username: "chef"
+       password: "cooking456"
+   
+   # IMPORTANT: Change this secret in production!
+   jwt_secret: "your-super-secret-jwt-key-change-this-in-production"
+   
+   # Token expiration time in hours
+   token_expiry_hours: 24
+   ```
+
+### Default Demo Users
+
+| Username | Password | Description |
+|----------|----------|-------------|
+| admin | admin123 | Administrator account |
+| chef | cooking456 | Chef account |
+| user1 | password123 | Regular user account |
+
+**⚠️ Security Note**: Change all default passwords and JWT secret before production use!
+
 ## Getting Started
 
 ### Prerequisites
@@ -76,37 +128,69 @@ recipe-api/
    go mod tidy
    ```
 
-3. **Run the application**:
+3. **Setup configuration**:
+   ```bash
+   cp config.yaml.example config.yaml
+   ```
+   Edit `config.yaml` to customize users and JWT secret.
+
+4. **Run the application**:
    ```bash
    go run main.go
    ```
 
-4. **Access the application**:
-   - Web Interface: http://localhost:8080
-   - API Base URL: http://localhost:8080/api/recipes
+5. **Access the application**:
+   - Web Interface: http://localhost:8080 (redirects to login)
+   - Login Page: http://localhost:8080/login.html
+   - API Endpoints: http://localhost:8080/api/
 
 ## Usage
 
 ### Web Interface
 
-1. Open your browser and go to `http://localhost:8080`
-2. Use the form on the left to add new recipes
-3. View all recipes on the right side
-4. Click "Edit" to modify a recipe
-5. Click "Delete" to remove a recipe
-6. Click "Refresh" to reload the recipe list
+1. **Login**: Open your browser and go to `http://localhost:8080`
+   - You'll be redirected to the login page
+   - Use demo credentials: `admin` / `admin123` or `chef` / `cooking456`
+   - Click on demo credentials in the login form to auto-fill
+
+2. **Recipe Management**: After successful login:
+   - Use the form on the left to add new recipes
+   - View all recipes on the right side
+   - Click "Edit" to modify a recipe
+   - Click "Delete" to remove a recipe
+   - Click "Refresh" to reload the recipe list
+
+3. **Logout**: Click the "Logout" button in the header to end your session
 
 ### API Usage Examples
 
-#### Get All Recipes
+#### Login to Get Token
 ```bash
-curl -X GET http://localhost:8080/api/recipes
+curl -X POST http://localhost:8080/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
 ```
 
-#### Create a New Recipe
+Response:
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "e8d1f2a3b4c5d6e7f8g9h0i1j2k3l4m5n6o7p8q9r0s1t2u3v4w5x6y7z8a9b0c1d2"
+}
+```
+
+#### Get All Recipes (Protected)
+```bash
+curl -X GET http://localhost:8080/api/recipes \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+#### Create a New Recipe (Protected)
 ```bash
 curl -X POST http://localhost:8080/api/recipes \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -d '{
     "name": "Chocolate Cake",
     "ingredients": ["2 cups flour", "1 cup sugar", "3 eggs"],
@@ -117,10 +201,11 @@ curl -X POST http://localhost:8080/api/recipes \
   }'
 ```
 
-#### Update a Recipe
+#### Update a Recipe (Protected)
 ```bash
 curl -X PUT http://localhost:8080/api/recipes \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -d '{
     "id": "recipe-uuid-here",
     "name": "Updated Recipe Name",
@@ -132,9 +217,16 @@ curl -X PUT http://localhost:8080/api/recipes \
   }'
 ```
 
-#### Delete a Recipe
+#### Delete a Recipe (Protected)
 ```bash
-curl -X DELETE http://localhost:8080/api/recipes/recipe-uuid-here
+curl -X DELETE http://localhost:8080/api/recipes/recipe-uuid-here \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+#### Logout
+```bash
+curl -X POST http://localhost:8080/api/logout \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
 ## API Response Format
