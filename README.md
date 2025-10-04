@@ -1,6 +1,6 @@
 # Recipe Notes - Go REST API Application
 
-A secure client-server application for managing recipe notes using Go's `net/http` library with authentication and a web interface.
+A secure client-server application for managing recipe notes using Go's `net/http` library with PostgreSQL database, authentication, and comprehensive API documentation.
 
 ## Features
 
@@ -9,10 +9,12 @@ A secure client-server application for managing recipe notes using Go's `net/htt
 - **📝 CRUD Operations**: Create, Read, Update, and Delete recipes
 - **🌐 REST API**: Clean RESTful endpoints with proper HTTP status codes
 - **💻 Web Interface**: User-friendly HTML interface with JavaScript
-- **📁 JSON Storage**: Data persistence using JSON files
-- **⚙️ YAML Configuration**: User management via configuration file
+- **🗄️ PostgreSQL Database**: Robust data persistence with audit columns
+- **📚 API Documentation**: Interactive Swagger/OpenAPI documentation
+- **⚙️ YAML Configuration**: Database and application configuration
 - **📱 Responsive Design**: Works on desktop and mobile devices
 - **🔄 Token Management**: Automatic token cleanup and expiration handling
+- **🔄 Database Migrations**: Automatic database schema management
 
 ## API Endpoints
 
@@ -28,7 +30,13 @@ A secure client-server application for managing recipe notes using Go's `net/htt
 | GET | `/api/recipes` | Get all recipes |
 | POST | `/api/recipes` | Create a new recipe |
 | PUT | `/api/recipes` | Update an existing recipe |
+| GET | `/api/recipes/{id}` | Get a specific recipe by ID |
 | DELETE | `/api/recipes/{id}` | Delete a recipe by ID |
+
+### Documentation Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/swagger/` | Interactive Swagger UI documentation |
 
 ## Project Structure
 
@@ -36,25 +44,38 @@ A secure client-server application for managing recipe notes using Go's `net/htt
 recipe-api/
 ├── main.go              # Server entry point
 ├── go.mod               # Go module file
-├── config.yaml          # Authentication configuration (users, JWT secret)
+├── config.yaml          # Database and application configuration
 ├── config.yaml.example  # Sample configuration file
 ├── auth/                # Authentication services
 │   └── auth_service.go  # Token management and validation
+├── database/            # Database connection and migrations
+│   ├── connection.go    # PostgreSQL connection setup
+│   └── migrate.go       # Database migration runner
+├── docs/                # API documentation
+│   └── docs.go          # Swagger/OpenAPI documentation
 ├── handlers/            # HTTP request handlers
 │   ├── recipe_handler.go # Recipe CRUD operations
 │   └── auth_handler.go   # Login/logout and middleware
+├── migrations/          # Database migration files
+│   ├── 001_create_users_table.up.sql
+│   ├── 001_create_users_table.down.sql
+│   ├── 002_create_recipes_table.up.sql
+│   ├── 002_create_recipes_table.down.sql
+│   ├── 003_insert_default_users.up.sql
+│   └── 003_insert_default_users.down.sql
 ├── models/              # Data structures
 │   ├── recipe.go        # Recipe and API response models
-│   └── config.go        # Configuration models
+│   └── config.go        # Configuration and user models
 ├── storage/             # Data persistence layer
-│   └── json_storage.go  # JSON file operations
+│   ├── interface.go     # Storage interfaces
+│   ├── postgres_storage.go # PostgreSQL recipe operations
+│   ├── user_storage.go  # PostgreSQL user operations
+│   └── json_storage.go  # Legacy JSON file operations
 ├── static/              # Web interface files
 │   ├── index.html       # Main recipe management page
 │   ├── login.html       # Login page
 │   ├── styles.css       # CSS styling
 │   └── script.js        # JavaScript functionality
-├── data/                # JSON data storage
-│   └── recipes.json     # Recipe data file
 └── README.md           # This file
 ```
 
@@ -70,11 +91,13 @@ recipe-api/
   "servings": 4,
   "category": "main course",
   "created_at": "2023-01-01T12:00:00Z",
-  "updated_at": "2023-01-01T12:00:00Z"
+  "updated_at": "2023-01-01T12:00:00Z",
+  "created_by": 1,
+  "updated_by": 1
 }
 ```
 
-## Authentication Configuration
+## Database Configuration
 
 ### Setup Configuration File
 
@@ -83,13 +106,16 @@ recipe-api/
    cp config.yaml.example config.yaml
    ```
 
-2. **Edit config.yaml** to customize users and security settings:
+2. **Edit config.yaml** to customize database and security settings:
    ```yaml
-   users:
-     - username: "admin"
-       password: "admin123"
-     - username: "chef"
-       password: "cooking456"
+   # Database configuration
+   database:
+     host: "localhost"
+     port: 5432
+     user: "postgres"
+     password: "your-password"
+     dbname: "recipe_api"
+     sslmode: "disable"
    
    # IMPORTANT: Change this secret in production!
    jwt_secret: "your-super-secret-jwt-key-change-this-in-production"
@@ -97,6 +123,21 @@ recipe-api/
    # Token expiration time in hours
    token_expiry_hours: 24
    ```
+
+### PostgreSQL Setup
+
+1. **Install PostgreSQL**:
+   - Download and install PostgreSQL from https://www.postgresql.org/download/
+   - Or use Docker: `docker run --name postgres -e POSTGRES_PASSWORD=yourpassword -p 5432:5432 -d postgres`
+
+2. **Create Database**:
+   ```sql
+   CREATE DATABASE recipe_api;
+   ```
+
+3. **Update Configuration**:
+   - Edit `config.yaml` with your PostgreSQL connection details
+   - Ensure the database user has CREATE and ALTER privileges for migrations
 
 ### Default Demo Users
 
@@ -113,6 +154,7 @@ recipe-api/
 ### Prerequisites
 
 - Go 1.21 or higher
+- PostgreSQL 12 or higher
 - Git (optional)
 
 ### Installation
@@ -128,21 +170,29 @@ recipe-api/
    go mod tidy
    ```
 
-3. **Setup configuration**:
+3. **Setup PostgreSQL database**:
+   ```bash
+   # Create database (if not using Docker)
+   createdb recipe_api
+   ```
+
+4. **Setup configuration**:
    ```bash
    cp config.yaml.example config.yaml
    ```
-   Edit `config.yaml` to customize users and JWT secret.
+   Edit `config.yaml` to customize database connection and JWT secret.
 
-4. **Run the application**:
+5. **Run the application**:
    ```bash
    go run main.go
    ```
+   The application will automatically run database migrations on startup.
 
-5. **Access the application**:
+6. **Access the application**:
    - Web Interface: http://localhost:8080 (redirects to login)
    - Login Page: http://localhost:8080/login.html
    - API Endpoints: http://localhost:8080/api/
+   - API Documentation: http://localhost:8080/swagger/
 
 ## Usage
 

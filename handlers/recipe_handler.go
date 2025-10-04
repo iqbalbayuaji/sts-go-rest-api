@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"recipe-api/models"
 	"recipe-api/storage"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,11 +15,11 @@ import (
 
 // RecipeHandler handles HTTP requests for recipes
 type RecipeHandler struct {
-	storage *storage.JSONStorage
+	storage storage.RecipeStorage
 }
 
 // NewRecipeHandler creates a new recipe handler
-func NewRecipeHandler(storage *storage.JSONStorage) *RecipeHandler {
+func NewRecipeHandler(storage storage.RecipeStorage) *RecipeHandler {
 	return &RecipeHandler{
 		storage: storage,
 	}
@@ -134,8 +135,11 @@ func (rh *RecipeHandler) createRecipe(w http.ResponseWriter, r *http.Request) {
 	recipe.CreatedAt = time.Now()
 	recipe.UpdatedAt = time.Now()
 
+	// Get user ID from request header
+	userID := rh.getUserIDFromRequest(r)
+
 	// Save recipe
-	if err := rh.storage.SaveRecipe(recipe); err != nil {
+	if err := rh.storage.SaveRecipe(recipe, userID); err != nil {
 		rh.sendError(w, fmt.Sprintf("Failed to save recipe: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -174,8 +178,11 @@ func (rh *RecipeHandler) updateRecipe(w http.ResponseWriter, r *http.Request) {
 	recipe.CreatedAt = existingRecipe.CreatedAt
 	recipe.UpdatedAt = time.Now()
 
+	// Get user ID from request header
+	userID := rh.getUserIDFromRequest(r)
+
 	// Save updated recipe
-	if err := rh.storage.SaveRecipe(recipe); err != nil {
+	if err := rh.storage.SaveRecipe(recipe, userID); err != nil {
 		rh.sendError(w, fmt.Sprintf("Failed to update recipe: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -220,4 +227,19 @@ func (rh *RecipeHandler) sendError(w http.ResponseWriter, message string, status
 	}
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(response)
+}
+
+// getUserIDFromRequest extracts user ID from request headers
+func (rh *RecipeHandler) getUserIDFromRequest(r *http.Request) *int {
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		return nil
+	}
+	
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		return nil
+	}
+	
+	return &userID
 }

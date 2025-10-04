@@ -7,15 +7,17 @@ import (
 
 // Recipe represents a recipe with all its details
 type Recipe struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Ingredients  []string  `json:"ingredients"`
-	Instructions string    `json:"instructions"`
-	CookingTime  string    `json:"cooking_time"`
-	Servings     int       `json:"servings"`
-	Category     string    `json:"category"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           string    `json:"id" db:"id"`
+	Name         string    `json:"name" db:"name"`
+	Ingredients  []string  `json:"ingredients" db:"ingredients"`
+	Instructions string    `json:"instructions" db:"instructions"`
+	CookingTime  string    `json:"cooking_time" db:"cooking_time"`
+	Servings     int       `json:"servings" db:"servings"`
+	Category     string    `json:"category" db:"category"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	CreatedBy    *int      `json:"created_by" db:"created_by"`
+	UpdatedBy    *int      `json:"updated_by" db:"updated_by"`
 }
 
 // Validate checks if the recipe has all required fields

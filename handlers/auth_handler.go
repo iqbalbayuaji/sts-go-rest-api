@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"recipe-api/auth"
 	"recipe-api/models"
@@ -53,13 +54,14 @@ func (ah *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate credentials
-	if !ah.authService.ValidateCredentials(loginReq.Username, loginReq.Password) {
+	user, valid := ah.authService.ValidateCredentials(loginReq.Username, loginReq.Password)
+	if !valid {
 		ah.sendLoginError(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
 	// Generate token
-	token, err := ah.authService.GenerateToken(loginReq.Username)
+	token, err := ah.authService.GenerateToken(user)
 	if err != nil {
 		ah.sendLoginError(w, "Failed to generate token", http.StatusInternalServerError)
 		return
@@ -145,14 +147,15 @@ func (ah *AuthHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Validate token
-		username, valid := ah.authService.ValidateToken(token)
+		tokenInfo, valid := ah.authService.ValidateToken(token)
 		if !valid {
 			ah.sendLoginError(w, "Invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 
-		// Add username to request context (optional, for logging)
-		r.Header.Set("X-Username", username)
+		// Add user info to request context (optional, for logging)
+		r.Header.Set("X-Username", tokenInfo.Username)
+		r.Header.Set("X-User-ID", fmt.Sprintf("%d", tokenInfo.UserID))
 
 		// Call next handler
 		next(w, r)

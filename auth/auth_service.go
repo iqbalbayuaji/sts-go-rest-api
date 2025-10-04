@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"recipe-api/models"
+	"recipe-api/storage"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 // AuthService handles authentication operations
 type AuthService struct {
 	config       *models.Config
+	userStorage  storage.UserStorage
 	activeTokens map[string]*TokenInfo
 	mutex        sync.RWMutex
 }
@@ -22,12 +24,13 @@ type AuthService struct {
 // TokenInfo stores information about an active token
 type TokenInfo struct {
 	Username  string
+	UserID    int
 	CreatedAt time.Time
 	ExpiresAt time.Time
 }
 
 // NewAuthService creates a new authentication service
-func NewAuthService(configPath string) (*AuthService, error) {
+func NewAuthService(configPath string, userStorage storage.UserStorage) (*AuthService, error) {
 	config, err := loadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %v", err)
@@ -35,6 +38,7 @@ func NewAuthService(configPath string) (*AuthService, error) {
 
 	return &AuthService{
 		config:       config,
+		userStorage:  userStorage,
 		activeTokens: make(map[string]*TokenInfo),
 	}, nil
 }
@@ -63,17 +67,16 @@ func loadConfig(configPath string) (*models.Config, error) {
 }
 
 // ValidateCredentials checks if username and password are valid
-func (as *AuthService) ValidateCredentials(username, password string) bool {
-	for _, user := range as.config.Users {
-		if user.Username == username && user.Password == password {
-			return true
-		}
+func (as *AuthService) ValidateCredentials(username, password string) (*models.User, bool) {
+	user, err := as.userStorage.ValidateCredentials(username, password)
+	if err != nil {
+		return nil, false
 	}
-	return false
+	return user, true
 }
 
 // GenerateToken creates a new authentication token
-func (as *AuthService) GenerateToken(username string) (string, error) {
+func (as *AuthService) GenerateToken(user *models.User) (string, error) {
 	// Generate a random token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -90,7 +93,8 @@ func (as *AuthService) GenerateToken(username string) (string, error) {
 	expiresAt := now.Add(time.Duration(as.config.TokenExpiryHours) * time.Hour)
 	
 	as.activeTokens[token] = &TokenInfo{
-		Username:  username,
+		Username:  user.Username,
+		UserID:    user.ID,
 		CreatedAt: now,
 		ExpiresAt: expiresAt,
 	}
@@ -99,23 +103,23 @@ func (as *AuthService) GenerateToken(username string) (string, error) {
 }
 
 // ValidateToken checks if a token is valid and not expired
-func (as *AuthService) ValidateToken(token string) (string, bool) {
+func (as *AuthService) ValidateToken(token string) (*TokenInfo, bool) {
 	as.mutex.RLock()
 	defer as.mutex.RUnlock()
 	
 	tokenInfo, exists := as.activeTokens[token]
 	if !exists {
-		return "", false
+		return nil, false
 	}
 	
 	// Check if token is expired
 	if time.Now().After(tokenInfo.ExpiresAt) {
 		// Remove expired token
 		go as.removeToken(token)
-		return "", false
+		return nil, false
 	}
 	
-	return tokenInfo.Username, true
+	return tokenInfo, true
 }
 
 // InvalidateToken removes a token from active tokens
